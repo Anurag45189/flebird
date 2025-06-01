@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flapping Bird Game</title>
+    
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1234567890123456"
+            crossorigin="anonymous"></script>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Press Start 2P', cursive;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #01131b; /* Sky Blue */
+            margin: 0;
+            overflow: hidden; /* Prevent scrollbars from game elements */
+            color: #fff;
+        }
+        #gameContainer {
+            border: 5px solid #333;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            position: relative; /* For positioning game over message */
+            width: 90%;
+            max-width: 400px; /* Max width for larger screens */
+            aspect-ratio: 3 / 4; /* Maintain a consistent aspect ratio */
+            background-color: #5c8d92; /* A slightly darker sky for canvas */
+            overflow: hidden; /* Ensure nothing spills out */
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: 5px; /* Inner radius for canvas */
+        }
+        #uiContainer {
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            margin-top: 20px;
+            position: relative; /* For absolute positioning of hearts */
+        }
+        #score {
+            font-size: 1.8rem;
+            color: #fff;
+            text-shadow: 2px 2px #333;
+            margin-bottom: 10px;
+            position: absolute; /* Position score and hearts */
+            top: 10px;
+            left: 10px;
+            z-index: 20; /* Above canvas */
+        }
+        #livesContainer {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 5px;
+            z-index: 20;
+        }
+        .heart {
+            width: 25px;
+            height: 25px;
+            background-color: #FF0000; /* Red heart */
+            position: relative;
+            transform: rotate(-45deg);
+        }
+        .heart::before,
+        .heart::after {
+            content: '';
+            width: 25px;
+            height: 25px;
+            background-color: #FF0000;
+            border-radius: 50%;
+            position: absolute;
+        }
+        .heart::before {
+            top: -12.5px;
+            left: 0;
+        }
+        .heart::after {
+            top: 0;
+            left: 12.5px;
+        }
+
+        #gameOverMessage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.75);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 10;
+            display: none; /* Hidden by default */
+            flex-direction: column; /* To stack elements */
+            align-items: center;
+        }
+        #gameOverMessage h2 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            color: #FFD700; /* Gold */
+        }
+        #gameOverMessage p {
+            font-size: 1rem;
+            margin-bottom: 15px;
+        }
+        #restartButton {
+            background-color: #0c630f; /* Green */
+            color: white;
+            padding: 12px 25px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 1rem;
+            border-radius: 8px;
+            border: 2px solid #3e8e41;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+            box-shadow: 0 4px #999;
+            margin-top: 15px; /* Space from ad placeholder */
+        }
+        #restartButton:hover {
+            background-color: #45a049;
+        }
+        #restartButton:active {
+            background-color: #3e8e41;
+            box-shadow: 0 2px #666;
+            transform: translateY(2px);
+        }
+        #instructions {
+            font-size: 0.8rem;
+            color: #f0f0f0;
+            text-shadow: 1px 1px #333;
+            margin-top: 15px;
+            position: absolute; /* Position relative to game container */
+            bottom: 20px;
+            width: 100%;
+            left: 0;
+        }
+        #adPlaceholder {
+            width: 100%;
+            /* Set a flexible height or a min-height for responsive ads. */
+            /* The ad will determine its actual size, but give it some space. */
+            min-height: 50px; 
+            max-height: 250px; /* Common banner height */
+            background-color: #333; /* Placeholder background before ad loads */
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            margin-bottom: 15px; /* Space between ad and restart button */
+            border: 1px dashed #FFD700;
+            box-sizing: border-box; /* Include padding/border in width/height */
+        }
+
+        /* Overlay for when game is paused/game over for ad/message */
+        #gameOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 5; /* Below game over message, above canvas */
+            pointer-events: none; /* Allows clicks to pass through initially */
+            display: none; /* Hidden by default */
+        }
+        /* Specific styling for game over to allow interaction with messages */
+        #gameContainer.game-over #gameOverlay {
+            display: flex;
+            pointer-events: auto; /* Allows interaction with game over message */
+        }
+
+        #gameContainer.game-over #gameOverMessage {
+            display: flex; /* Show game over message */
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="gameOverlay"></div>
+        <div id="score" class="absolute">Score: 0</div>
+        <div id="livesContainer" class="absolute">
+        </div>
+        <div id="gameOverMessage">
+            <h2>Game Over!</h2>
+            <div id="adPlaceholder">
+                <ins class="adsbygoogle"
+                     style="display:block"
+                     data-ad-client="ca-pub-1234567890123456"
+                     data-ad-slot="1234567890"></ins>
+                <script>
+                     (adsbygoogle = window.adsbygoogle || []).push({});
+                </script>
+            </div>
+            <p id="finalScore">Your Score: 0</p>
+            <button id="restartButton">Restart</button>
+        </div>
+        <div id="instructions">Click or Tap to Flap!</div>
+    </div>
+    <div id="uiContainer">
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameContainer = document.getElementById('gameContainer');
+        const gameOverlay = document.getElementById('gameOverlay'); // New overlay element
+        const scoreDisplay = document.getElementById('score');
+        const livesContainer = document.getElementById('livesContainer'); // New lives container
+        const gameOverMessage = document.getElementById('gameOverMessage');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const restartButton = document.getElementById('restartButton');
+        const instructionsDisplay = document.getElementById('instructions');
+
+        // Game variables
+        let bird;
+        let pipes;
+        let score;
+        let lives; // New variable for lives
+        const MAX_LIVES = 1; // ***** CHANGED TO 1 HEART *****
+        let gameSpeed;
+        let gravity;
+        let flapStrength;
+        let pipeWidth;
+        let pipeGap;
+        let pipeSpawnInterval; // Time in ms between pipe spawns
+        let frameCount;
+        let gameState; // 'start', 'playing', 'gameOver', 'hit' (for invincibility)
+        let animationFrameId = null; // To store the ID of the animation frame
+        let hitTimer = 0; // Timer for invincibility frames
+        const HIT_INVINCIBILITY_DURATION = 90; // Frames of invincibility after a hit (approx 1.5 seconds at 60fps)
+        const GROUND_OFFSET_FACTOR = 0.1; // 10% of canvas height as ground offset
+
+        // Bird SVG (simple representation)
+        const birdSVG = new Image();
+        birdSVG.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="40" height="40">
+                <g transform="translate(0,0)">
+                    <ellipse cx="50" cy="60" rx="30" ry="20" fill="#FFD700"/>
+                    <path d="M30,55 Q50,35 70,50 L70,60 Q50,45 30,65 Z" fill="#FFA500"/>
+                    <circle cx="65" cy="55" r="5" fill="#000000"/>
+                    <circle cx="67" cy="53" r="2" fill="#FFFFFF"/>
+                    <polygon points="78,58 90,63 78,68" fill="#FF4500"/>
+                </g>
+            </svg>
+        `)}`;
+        let birdWidth, birdHeight;
+
+
+        function resizeCanvas() {
+            canvas.width = gameContainer.clientWidth;
+            canvas.height = gameContainer.clientHeight;
+            birdWidth = canvas.width / 10;
+            birdHeight = birdWidth * (birdSVG.naturalHeight / birdSVG.naturalWidth || 0.75); // Maintain aspect ratio, default 0.75
+            pipeWidth = canvas.width / 7;
+            pipeGap = birdHeight * 4.5;
+            gravity = canvas.height / 2000;
+            flapStrength = canvas.height / 80;
+            gameSpeed = canvas.width / 200;
+
+            // Adjust bird position on resize if it exists
+            if (bird) {
+                bird.x = canvas.width / 4;
+                // Keep bird within scaled bounds relative to new height
+                const groundOffset = canvas.height * GROUND_OFFSET_FACTOR;
+                if (bird.y > canvas.height - bird.height - groundOffset) {
+                    bird.y = canvas.height - bird.height - groundOffset;
+                }
+            }
+        }
+
+        function Bird() {
+            // These are initial values, potentially overridden in init() for robustness
+            this.x = canvas.width / 4; 
+            this.y = canvas.height / 2;
+            this.width = birdWidth;
+            this.height = birdHeight;
+            this.velocity = 0;
+            this.isInvincible = false;
+
+            this.draw = function() {
+                if (birdSVG.complete && birdSVG.naturalWidth > 0) {
+                    ctx.save();
+                    ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+                    let angle = Math.PI / 180 * (this.velocity * 1.5);
+                    if (angle > Math.PI / 4) angle = Math.PI / 4;
+                    if (angle < -Math.PI / 6) angle = -Math.PI / 6;
+                    ctx.rotate(angle);
+
+                    // Flash bird when invincible
+                    if (this.isInvincible && Math.floor(frameCount / 10) % 2 === 0) {
+                        ctx.globalAlpha = 0.5; // Make bird semi-transparent
+                    }
+                    ctx.drawImage(birdSVG, -this.width / 2, -this.height / 2, this.width, this.height);
+                    ctx.restore();
+                    ctx.globalAlpha = 1; // Reset alpha
+                } else {
+                    ctx.fillStyle = '#FFD700';
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+            }
+
+            this.update = function() {
+                this.velocity += gravity;
+                this.y += this.velocity;
+
+                const groundOffset = canvas.height * GROUND_OFFSET_FACTOR;
+
+                // Collision with top of canvas
+                if (this.y < 0) {
+                    this.y = 0;
+                    this.velocity = 0;
+                    // No game over on top collision, just bounce off
+                }
+                // Collision with ground
+                if (this.y + this.height > canvas.height - groundOffset) {
+                    this.y = canvas.height - this.height - groundOffset;
+                    this.velocity = 0;
+                    if (gameState === 'playing' && !this.isInvincible) {
+                        handleHit(); // Lose a life on ground hit
+                    }
+                }
+
+                // Handle invincibility timer
+                if (this.isInvincible) {
+                    hitTimer++;
+                    if (hitTimer >= HIT_INVINCIBILITY_DURATION) {
+                        this.isInvincible = false;
+                        hitTimer = 0;
+                        gameState = 'playing'; // Resume normal playing state
+                    }
+                }
+            }
+
+            this.flap = function() {
+                if (gameState === 'playing' || gameState === 'hit') { // Can flap while invincible
+                    this.velocity = -flapStrength;
+                } else if (gameState === 'start') {
+                    startGame();
+                    this.velocity = -flapStrength; // Initial flap to start game
+                }
+            }
+        }
+
+        function Pipe() {
+            this.x = canvas.width;
+            this.width = pipeWidth;
+            this.gap = pipeGap;
+            const minTopPipeHeight = canvas.height / 10; // Minimum height for top pipe
+            const maxTopPipeHeight = canvas.height - this.gap - (canvas.height * GROUND_OFFSET_FACTOR) - minTopPipeHeight;
+            this.topPipeHeight = Math.random() * (maxTopPipeHeight - minTopPipeHeight) + minTopPipeHeight;
+
+            this.bottomPipeY = this.topPipeHeight + this.gap;
+            this.passed = false;
+
+            this.draw = function() {
+                ctx.fillStyle = '#2E8B57'; // SeaGreen for pipes
+                ctx.fillRect(this.x, 0, this.width, this.topPipeHeight);
+                ctx.fillRect(this.x, this.bottomPipeY, this.width, canvas.height - this.bottomPipeY - (canvas.height * GROUND_OFFSET_FACTOR));
+
+                const capHeight = 20;
+                ctx.fillRect(this.x - 5, this.topPipeHeight - capHeight, this.width + 10, capHeight);
+                ctx.fillRect(this.x - 5, this.bottomPipeY, this.width + 10, capHeight);
+            }
+
+            this.update = function() {
+                this.x -= gameSpeed;
+            }
+        }
+
+        function handlePipes() {
+            if (frameCount % Math.floor(pipeSpawnInterval / (1000/60)) === 0) {
+                pipes.push(new Pipe());
+            }
+
+            for (let i = pipes.length - 1; i >= 0; i--) {
+                pipes[i].update();
+                pipes[i].draw();
+
+                // Collision detection with pipes
+                // Only check for collision if not invincible
+                if (!bird.isInvincible && gameState !== 'gameOver') {
+                    if (
+                        bird.x < pipes[i].x + pipes[i].width &&
+                        bird.x + bird.width > pipes[i].x &&
+                        (bird.y < pipes[i].topPipeHeight || bird.y + bird.height > pipes[i].bottomPipeY)
+                    ) {
+                        handleHit(); // Lose a life on pipe collision
+                    }
+                }
+
+                // Scoring
+                if (!pipes[i].passed && pipes[i].x + pipes[i].width < bird.x) {
+                    pipes[i].passed = true;
+                    score++;
+                    scoreDisplay.textContent = `Score: ${score}`;
+                }
+
+                // Remove off-screen pipes
+                if (pipes[i].x + pipes[i].width < 0) {
+                    pipes.splice(i, 1);
+                }
+            }
+        }
+
+        function drawGround() {
+            const groundHeight = canvas.height * GROUND_OFFSET_FACTOR;
+            ctx.fillStyle = '#8B4513'; // SaddleBrown
+            ctx.fillRect(0, canvas.height - groundHeight, canvas.width, groundHeight);
+
+            ctx.fillStyle = '#228B22'; // ForestGreen
+            for (let i = 0; i < canvas.width; i += 20) {
+                const grassHeight = Math.random() * 10 + 5;
+                ctx.beginPath();
+                ctx.moveTo(i, canvas.height - groundHeight);
+                ctx.lineTo(i + 5, canvas.height - groundHeight - grassHeight);
+                ctx.lineTo(i + 10, canvas.height - groundHeight);
+                ctx.fill();
+            }
+        }
+
+        function updateLivesDisplay() {
+            livesContainer.innerHTML = ''; // Clear existing hearts
+            for (let i = 0; i < MAX_LIVES; i++) {
+                const heart = document.createElement('div');
+                heart.classList.add('heart');
+                if (i >= lives) {
+                    heart.style.backgroundColor = 'grey'; // Show empty hearts
+                    heart.style.opacity = '0.5';
+                    heart.style.filter = 'grayscale(100%)';
+                }
+                livesContainer.appendChild(heart);
+            }
+        }
+
+        function handleHit() {
+            if (bird.isInvincible || gameState === 'gameOver') return; // Prevent multiple hits
+            
+            lives--;
+            updateLivesDisplay();
+            bird.isInvincible = true;
+            hitTimer = 0;
+            
+            // Respawn bird at initial position and reset velocity
+            bird.x = canvas.width / 4;
+            bird.y = canvas.height / 2;
+            bird.velocity = 0;
+
+            // Set to 'hit' state to trigger invincibility and pause pipe spawning (temporarily)
+            gameState = 'hit'; 
+
+            if (lives <= 0) {
+                endGame();
+            } else {
+                console.log(`Hit! Lives remaining: ${lives}. Bird respawned.`);
+            }
+        }
+
+
+        function gameLoop() {
+            if (gameState === 'gameOver') {
+                return;
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Pipes should continue to move even when the bird is invincible (gameState 'hit')
+            if (gameState === 'playing' || gameState === 'hit') {
+                handlePipes();
+            }
+            
+            bird.update();
+            bird.draw();
+            drawGround();
+
+            if (gameState === 'start') {
+                ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+                ctx.fillRect(0, canvas.height / 2 - 30, canvas.width, 60);
+                ctx.fillStyle = "white";
+                ctx.font = `${canvas.width / 20}px '${getComputedStyle(document.body).fontFamily}'`;
+                ctx.textAlign = "center";
+                ctx.fillText("Click or Tap to Start!", canvas.width / 2, canvas.height / 2 + (canvas.width / 60));
+                instructionsDisplay.style.display = 'block';
+                gameContainer.classList.remove('game-over'); // Ensure no overlay
+            } else {
+                instructionsDisplay.style.display = 'none';
+                gameContainer.classList.remove('game-over'); // Ensure no overlay
+            }
+            
+            frameCount++;
+            
+            if (gameState !== 'gameOver') {
+                animationFrameId = requestAnimationFrame(gameLoop);
+            } else {
+                console.log("gameLoop: gameState is 'gameOver', not scheduling next animation frame.");
+            }
+        }
+
+        function init() {
+            console.log("init() called. Current animationFrameId:", animationFrameId, "gameState:", gameState);
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                console.log("Cancelled animation frame:", animationFrameId);
+                animationFrameId = null;
+            }
+
+            resizeCanvas(); // Ensure canvas dimensions are set first
+
+            // Explicitly set bird properties after resize, before creating new Bird object if needed
+            // This ensures consistent starting properties for the Bird constructor
+            birdWidth = canvas.width / 10;
+            birdHeight = birdWidth * (birdSVG.naturalHeight / birdSVG.naturalWidth || 0.75);
+
+            bird = new Bird(); // Now Bird constructor uses updated birdWidth/Height
+            bird.x = canvas.width / 4; // Explicitly set bird's starting X
+            bird.y = canvas.height / 2; // Explicitly set bird's starting Y
+            bird.velocity = 0; // Ensure velocity is reset
+            bird.isInvincible = false; // Ensure invincibility is reset
+            hitTimer = 0; // Reset hit timer
+
+            pipes = [];
+            score = 0;
+            lives = MAX_LIVES; // Reset lives
+            frameCount = 0;
+            gameState = 'start';
+            
+            pipeSpawnInterval = 2000;
+
+            scoreDisplay.textContent = `Score: ${score}`;
+            gameOverMessage.style.display = 'none';
+            gameContainer.classList.remove('game-over'); // Hide overlay if it was active
+            instructionsDisplay.style.display = 'block';
+            updateLivesDisplay(); // Initialize hearts display
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            bird.draw(); // Draw bird in its initial position
+            drawGround();
+
+            // Draw the start message immediately as gameState is 'start'
+            ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+            ctx.fillRect(0, canvas.height / 2 - 30, canvas.width, 60);
+            ctx.fillStyle = "white";
+            ctx.font = `${canvas.width / 20}px '${getComputedStyle(document.body).fontFamily}'`;
+            ctx.textAlign = "center";
+            ctx.fillText("Click or Tap to Start!", canvas.width / 2, canvas.height / 2 + (canvas.width / 60));
+
+            if (typeof requestAnimationFrame !== 'undefined') {
+                animationFrameId = requestAnimationFrame(gameLoop);
+            }
+            console.log("Game initialized/restarted. New animationFrameId:", animationFrameId, "New gameState:", gameState);
+        }
+
+        function startGame() {
+            if (gameState === 'start') {
+                gameState = 'playing';
+                instructionsDisplay.style.display = 'none';
+                console.log("Game started. gameState:", gameState);
+            }
+        }
+
+        function endGame() {
+            if (gameState === 'gameOver') {
+                console.log("endGame() called, but gameState is already 'gameOver'. Doing nothing.");
+                return;
+            }
+            
+            gameState = 'gameOver';
+            finalScoreDisplay.textContent = `Your Score: ${score}`;
+            gameOverMessage.style.display = 'flex'; // Use flex for centering content
+            gameContainer.classList.add('game-over'); // Show overlay
+            instructionsDisplay.style.display = 'none';
+
+            console.log("endGame() called. Current animationFrameId:", animationFrameId);
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                console.log("Cancelled animation frame in endGame:", animationFrameId);
+                animationFrameId = null;
+            }
+            console.log("Game ended. gameState:", gameState, "animationFrameId is now:", animationFrameId);
+        }
+
+        // Event Listeners
+        gameContainer.addEventListener('mousedown', () => bird.flap());
+        gameContainer.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            bird.flap();
+        }, { passive: false });
+
+        restartButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            console.log("Restart button clicked.");
+            init();
+        });
+        
+        window.addEventListener('resize', () => {
+            console.log("Window resize event triggered.");
+            let relativeBirdY = null;
+            if (bird && gameState !== 'gameOver') {
+                relativeBirdY = bird.y / canvas.height;
+            }
+            
+            resizeCanvas(); 
+
+            if (bird && gameState !== 'gameOver' && relativeBirdY !== null) {
+                bird.y = relativeBirdY * canvas.height;
+                bird.width = birdWidth;
+                bird.height = birdHeight;
+                pipes.forEach(pipe => {
+                    pipe.width = pipeWidth;
+                    pipe.gap = pipeGap;
+                });
+                console.log("Resized during active game. Bird and pipes adjusted.");
+            } else {
+                if (gameState === 'gameOver' || !bird) {
+                    console.log("Resized while game over or bird not present. Re-initializing.");
+                    init(); // Re-initialize for a clean state
+                }
+            }
+
+            // Redraw the current state after resize
+            if (gameState !== 'gameOver') {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                if (pipes && (gameState === 'playing' || gameState === 'hit')) { // Ensure pipes are redrawn if moving
+                    pipes.forEach(p => p.draw());
+                }
+                if (bird) bird.draw();
+                drawGround();
+                if (gameState === 'start') { // Ensure start message is redrawn if in start state
+                    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+                    ctx.fillRect(0, canvas.height / 2 - 30, canvas.width, 60);
+                    ctx.fillStyle = "white";
+                    ctx.font = `${canvas.width / 20}px '${getComputedStyle(document.body).fontFamily}'`;
+                    ctx.textAlign = "center";
+                    ctx.fillText("Click or Tap to Start!", canvas.width / 2, canvas.height / 2 + (canvas.width / 60));
+                }
+                updateLivesDisplay(); // Update lives display on resize
+            } else { // If game over, ensure message is still visible
+                finalScoreDisplay.textContent = `Your Score: ${score}`;
+                gameOverMessage.style.display = 'flex';
+                gameContainer.classList.add('game-over'); // Ensure overlay is visible
+                console.log("Resized, game is over. Ensured game over message is visible.");
+            }
+        });
+
+        // Simplified SVG loading logic
+        birdSVG.onload = () => {
+            console.log("Bird SVG loaded successfully. Calling init().");
+            init();
+        };
+        birdSVG.onerror = () => {
+            console.error("Bird SVG failed to load. Using fallback. Calling init().");
+            init();
+        };
+
+        // Check if SVG is already complete (e.g. cached)
+        if (birdSVG.complete) {
+            console.log("Bird SVG reported as complete on initial check. Natural width:", birdSVG.naturalWidth);
+            setTimeout(() => {
+                if (!animationFrameId && gameState !== 'playing' && gameState !== 'gameOver') {
+                    console.log("Bird SVG was complete, calling init() via setTimeout as game not active.");
+                    init();
+                } else if (birdSVG.naturalWidth > 0 && !bird) {
+                    console.log("Bird SVG was complete and valid, but bird object missing. Calling init() via setTimeout.");
+                    init();
+                } else {
+                    console.log("Bird SVG was complete, but init() not called via setTimeout due to existing game state or invalid SVG.");
+                }
+            }, 0);
+        }
+    </script>
+</body>
+</html>
